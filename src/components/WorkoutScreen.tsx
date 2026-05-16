@@ -127,7 +127,21 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ exercise, onEnd, o
       if (!videoRef.current || !canvasRef.current) return;
 
       try {
-        const ctx = canvasRef.current.getContext('2d');
+        const isOffscreenSupported = !!(canvasRef.current as any).transferControlToOffscreen;
+        let offscreenEnabled = false;
+
+        if (isOffscreenSupported) {
+          try {
+            const offscreen = (canvasRef.current as any).transferControlToOffscreen();
+            worker.postMessage({ type: 'initCanvas', canvas: offscreen }, [offscreen]);
+            offscreenEnabled = true;
+            console.log("[WorkoutScreen] OffscreenCanvas enabled.");
+          } catch (e) {
+            console.warn("[WorkoutScreen] Failed to transfer canvas control:", e);
+          }
+        }
+
+        const ctx = !offscreenEnabled ? canvasRef.current.getContext('2d') : null;
         if (ctx) overlayRenderer.setContext(ctx);
 
         sessionRecorder.start();
@@ -145,8 +159,10 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ exercise, onEnd, o
           frameSkipRef.current++;
           if (frameSkipRef.current % 2 !== 0) {
             // Still render overlay on skipped frames for smooth display
-            const primaryJoints = exercise.joints?.flat() || [];
-            overlayRenderer.draw(results, mutableState.current.status, primaryJoints);
+            if (!offscreenEnabled) {
+              const primaryJoints = exercise.joints?.flat() || [];
+              overlayRenderer.draw(results, mutableState.current.status, primaryJoints);
+            }
             return;
           }
 
@@ -172,10 +188,14 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ exercise, onEnd, o
 
           // ── Offload angle computation to Web Worker ────────────────────────
           pendingLandmarksRef.current = results.poseLandmarks;
+          const primaryJoints = exercise.joints?.flat() || [];
+          
           worker.postMessage({
             landmarks: results.poseLandmarks,
             exercise: exercise.key,
             frameId: frameSkipRef.current,
+            status: mutableState.current.status,
+            primaryJoints: primaryJoints
           });
 
           // Use last worker result for angles (may be 1 frame stale — acceptable)
@@ -209,9 +229,10 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ exercise, onEnd, o
             exercise: exercise.key
           });
 
-          // 5. Rendering
-          const primaryJoints = exercise.joints?.flat() || [];
-          overlayRenderer.draw(results, nextState.status, primaryJoints);
+          // 5. Rendering (Main thread fallback if OffscreenCanvas disabled)
+          if (!offscreenEnabled) {
+            overlayRenderer.draw(results, nextState.status, primaryJoints);
+          }
         });
 
         const loop = (timestamp: number) => {
