@@ -1,11 +1,14 @@
 const fs = require('fs');
+const path = require('path');
 const { buildSessionFilePath } = require('../../shared/utils/paths');
 
 const SESSION_FILE_TTL_DAYS = parseInt(process.env.SESSION_FILE_TTL_DAYS || '7');
 const CLEANUP_INTERVAL_HOURS = parseInt(process.env.CLEANUP_INTERVAL_HOURS || '24');
 
+const SESSION_FILE_TTL_DAYS = parseInt(process.env.SESSION_FILE_TTL_DAYS || '7');
+const CLEANUP_INTERVAL_HOURS = parseInt(process.env.CLEANUP_INTERVAL_HOURS || '24');
+
 function createSessionService({ sessionStore, sessionPath, maxSessionFrames, logger }) {
-  const finalizedSessions = new Set();
   let cleanupIntervalId = null;
 
   function appendFrame(socketId, frame) {
@@ -84,7 +87,6 @@ function createSessionService({ sessionStore, sessionPath, maxSessionFrames, log
   async function finalizeSession(socketId) {
     if (finalizedSessions.has(socketId)) return [];
     finalizedSessions.add(socketId);
-
     try {
       const frames = sessionStore.getSessionFrames(socketId);
       if (frames && frames.length > 0) {
