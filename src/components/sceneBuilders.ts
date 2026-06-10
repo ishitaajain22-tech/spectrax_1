@@ -40,11 +40,11 @@ export const BONES_CONNECTIONS: readonly [number, number][] = [
   [26, 28],
 ] as const;
 
-export const MUSCLE_JOINT_GROUPS: Record<string, number[]> = {
+export const MUSCLE_JOINT_GROUPS = {
   arms: [11, 12, 13, 14, 15, 16],
   core: [11, 12, 23, 24],
   legs: [23, 24, 25, 26, 27, 28],
-};
+} as const;
 
 export const STRESS_VECTOR_ATTACHMENTS: ReadonlyArray<{
   jointIdx: number;
