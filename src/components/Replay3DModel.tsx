@@ -1091,19 +1091,34 @@ export const Replay3DModel: React.FC<Replay3DModelProps> = ({
       }
       disposeRendererPipeline();
 
-      // Dispose joint meshes
+      // Dispose joint meshes — all 33 share one geometry instance, so dispose
+      // it once from the first mesh; dispose each mesh's cloned material individually.
+      if (jointsRef.current.length > 0) {
+        jointsRef.current[0].geometry.dispose();
+      }
       jointsRef.current.forEach((mesh) => {
-        mesh.geometry.dispose();
         (mesh.material as THREE.Material).dispose();
+        sceneRef.current?.remove(mesh);
       });
       jointsRef.current = [];
 
-      // Dispose skeleton lines
+      // Dispose skeleton lines — each line has its own geometry and material.
       bonesRef.current.forEach(({ line }) => {
         line.geometry.dispose();
         (line.material as THREE.Material).dispose();
+        sceneRef.current?.remove(line);
       });
       bonesRef.current = [];
+
+      // Dispose axes helpers — AxesHelper is a LineSegments object with its own
+      // geometry/material; skipped by the isMesh scene traversal below so must
+      // be cleaned up explicitly here to avoid leaking on unmount/remount.
+      axesRef.current.forEach((helper) => {
+        helper.geometry.dispose();
+        (helper.material as THREE.Material).dispose();
+        sceneRef.current?.remove(helper);
+      });
+      axesRef.current = [];
 
       // Dispose stress vectors
       stressVectorsRef.current.forEach(({ mesh, material, geometry }) => {
